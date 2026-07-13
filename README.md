@@ -65,7 +65,7 @@ supabase/
 1. Clone the repository and install dependencies.
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Azmeer-59189/TaskTrail.git
    cd TaskTrail
    npm install
    ```
