@@ -1,0 +1,31 @@
+{
+  "name": "tasktrail",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mobile and web based field operations app for service teams.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev:web",
+    "dev:web": "npm run dev -w @tasktrail/web",
+    "dev:mobile": "npm run start -w @tasktrail/mobile",
+    "build": "npm run build -w @tasktrail/shared && npm run build -w @tasktrail/web",
+    "lint": "npm run lint -ws --if-present",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
