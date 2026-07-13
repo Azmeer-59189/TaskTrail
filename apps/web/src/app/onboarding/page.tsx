@@ -36,7 +36,7 @@ export default async function OnboardingPage({
           Name your company workspace
         </h1>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          This is where managers, workers, customers, and jobs will live.
+          This is where managers, developers, projects, and tasks will live.
         </p>
         {searchParams.error && (
           <div className="mt-5 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

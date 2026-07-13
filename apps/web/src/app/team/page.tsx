@@ -27,7 +27,7 @@ export default async function TeamPage({
         <p className="text-sm font-semibold text-field">People</p>
         <h1 className="mt-1 text-3xl font-semibold text-ink">Team</h1>
         <p className="mt-2 text-sm text-zinc-500">
-          Create worker or manager accounts for this workspace.
+          Create developer or manager accounts for this workspace.
         </p>
       </header>
       <Notice>{searchParams.error}</Notice>
@@ -45,7 +45,7 @@ export default async function TeamPage({
           <Field
             label="Email"
             name="email"
-            placeholder="worker@company.com"
+            placeholder="developer@company.com"
             type="email"
           />
           <Field
@@ -61,7 +61,7 @@ export default async function TeamPage({
               name="role"
               defaultValue="worker"
             >
-              <option value="worker">Worker</option>
+              <option value="worker">Developer</option>
               <option value="manager">Manager</option>
             </select>
           </label>
@@ -95,7 +95,7 @@ export default async function TeamPage({
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-bold uppercase text-field">
-                    {member.role}
+                    {member.role === "worker" ? "developer" : member.role}
                   </p>
                   <p className="text-xs text-zinc-400">{member.status}</p>
                 </div>

@@ -14,13 +14,8 @@
       "adaptiveIcon": {
         "backgroundColor": "#1F7A5A"
       },
-      "permissions": [
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECORD_AUDIO"
-      ],
       "package": "com.syed_azmeer.tasktrail"
     },
-    "plugins": ["expo-router", "expo-location", "expo-image-picker"]
+    "plugins": ["expo-router"]
   }
 }

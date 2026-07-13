@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { formatJobStatus, type JobStatus } from "@tasktrail/shared";
+import * as Linking from "expo-linking";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -23,6 +24,19 @@ type AssignedJob = {
   scheduled_date: string;
   time_window_start: string | null;
   time_window_end: string | null;
+  task_type: string;
+  estimated_hours: number | null;
+  logged_hours: number;
+  github_url: string | null;
+  blocker_reason: string | null;
+  project: { name: string; code: string } | null;
+};
+type TaskUpdate = {
+  id: string;
+  update_type: string;
+  body: string;
+  hours_logged: number;
+  created_at: string;
 };
 type ChecklistItem = {
   id: string;
@@ -39,6 +53,20 @@ function friendlyError(error: unknown) {
   return /fetch|network|resolve|connection/i.test(message)
     ? connectionMessage
     : message;
+}
+
+function normalizeExternalUrl(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const candidate = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  try {
+    const url = new URL(candidate);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 export default function HomeScreen() {
@@ -96,10 +124,10 @@ function SignInScreen() {
       <View style={styles.brandMark}>
         <Text style={styles.brandMarkText}>TT</Text>
       </View>
-      <Text style={styles.kicker}>TASKTRAIL WORKER</Text>
-      <Text style={styles.authTitle}>Your field work, in one place.</Text>
+      <Text style={styles.kicker}>TASKTRAIL DEVELOPER</Text>
+      <Text style={styles.authTitle}>Your development work, in one place.</Text>
       <Text style={styles.subtitle}>
-        Sign in with the worker account provided by your manager.
+        Sign in with the developer account provided by your manager.
       </Text>
       <View style={styles.formCard}>
         <Text style={styles.label}>Email</Text>
@@ -108,7 +136,7 @@ function SignInScreen() {
           autoComplete="email"
           keyboardType="email-address"
           onChangeText={setEmail}
-          placeholder="worker@company.com"
+          placeholder="developer@company.com"
           style={styles.input}
           value={email}
         />
@@ -194,7 +222,7 @@ function WorkerScreen({ session }: { session: Session }) {
           supabase
             .from("jobs")
             .select(
-              "id, title, description, status, priority, scheduled_date, time_window_start, time_window_end",
+              "id, title, description, status, priority, scheduled_date, time_window_start, time_window_end, task_type, estimated_hours, logged_hours, github_url, blocker_reason, project:projects(name, code)",
             )
             .eq("assigned_to", profile.id)
             .order("scheduled_date", { ascending: true }),
@@ -205,7 +233,12 @@ function WorkerScreen({ session }: { session: Session }) {
         role: membership.role,
         workspaceName: workspace?.name ?? "Workspace",
       });
-      setJobs((assignedJobs ?? []) as AssignedJob[]);
+      setJobs(
+        (assignedJobs ?? []).map((task) => ({
+          ...task,
+          project: Array.isArray(task.project) ? task.project[0] : task.project,
+        })) as AssignedJob[],
+      );
     } catch (loadError) {
       setError(friendlyError(loadError));
     } finally {
@@ -244,10 +277,10 @@ function WorkerScreen({ session }: { session: Session }) {
           <Text style={styles.kicker}>
             {context?.workspaceName.toUpperCase() ?? "TASKTRAIL"}
           </Text>
-          <Text style={styles.title}>Hi, {context?.fullName ?? "worker"}</Text>
+          <Text style={styles.title}>Hi, {context?.fullName ?? "developer"}</Text>
           <Text style={styles.subtitle}>
             {context?.role === "worker"
-              ? "Your assigned field jobs"
+              ? "Your assigned development tasks"
               : `Signed in as ${context?.role ?? "member"}`}
           </Text>
         </View>
@@ -266,9 +299,9 @@ function WorkerScreen({ session }: { session: Session }) {
       <View style={styles.list}>
         {jobs.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No assigned jobs</Text>
+            <Text style={styles.emptyTitle}>No assigned tasks</Text>
             <Text style={styles.emptyCopy}>
-              New assignments from your manager will appear here. Pull down to
+              New tasks from your manager will appear here. Pull down to
               refresh.
             </Text>
           </View>
@@ -296,18 +329,22 @@ function JobCard({ job, onOpen }: { job: AssignedJob; onOpen: () => void }) {
         <Text style={styles.jobTitle}>{job.title}</Text>
         <Text style={styles.badge}>{formatJobStatus(job.status)}</Text>
       </View>
-      {job.description && <Text style={styles.meta}>{job.description}</Text>}
+      <Text style={styles.meta}>
+        {job.project?.code ?? "PROJECT"} · {job.task_type}
+      </Text>
+      {job.description && (
+        <Text numberOfLines={2} style={styles.meta}>
+          {job.description}
+        </Text>
+      )}
       <View style={styles.row}>
         <Text style={styles.time}>
           {job.scheduled_date}
-          {job.time_window_start
-            ? ` · ${job.time_window_start.slice(0, 5)}`
-            : ""}
-          {job.time_window_end ? `–${job.time_window_end.slice(0, 5)}` : ""}
+          {` · ${Number(job.logged_hours ?? 0)}h logged`}
         </Text>
         <Text style={styles.priority}>{job.priority}</Text>
       </View>
-      <Text style={styles.openHint}>Open job →</Text>
+      <Text style={styles.openHint}>Open task →</Text>
     </Pressable>
   );
 }
@@ -323,22 +360,46 @@ function JobDetail({
 }) {
   const [status, setStatus] = useState(job.status);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [updates, setUpdates] = useState<TaskUpdate[]>([]);
+  const [updateKind, setUpdateKind] = useState<
+    "progress" | "blocker" | "time" | "link"
+  >("progress");
+  const [updateBody, setUpdateBody] = useState("");
+  const [hours, setHours] = useState("");
+  const [githubUrl, setGithubUrl] = useState(job.github_url ?? "");
+  const [loggedHours, setLoggedHours] = useState(
+    Number(job.logged_hours ?? 0),
+  );
+  const [blockerReason, setBlockerReason] = useState(
+    job.blocker_reason ?? "",
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase
-      .from("job_checklist_items")
-      .select("id, label, is_required, is_completed")
-      .eq("job_id", job.id)
-      .order("sort_order")
-      .then(({ data, error: checklistError }) => {
-        if (checklistError) setError(friendlyError(checklistError));
-        setChecklist((data ?? []) as ChecklistItem[]);
-        setLoading(false);
-      });
+  const loadDetails = useCallback(async () => {
+    const [checklistResult, updatesResult] = await Promise.all([
+      supabase
+        .from("job_checklist_items")
+        .select("id, label, is_required, is_completed")
+        .eq("job_id", job.id)
+        .order("sort_order"),
+      supabase
+        .from("task_updates")
+        .select("id, update_type, body, hours_logged, created_at")
+        .eq("job_id", job.id)
+        .order("created_at", { ascending: false }),
+    ]);
+    const detailsError = checklistResult.error ?? updatesResult.error;
+    if (detailsError) setError(friendlyError(detailsError));
+    setChecklist((checklistResult.data ?? []) as ChecklistItem[]);
+    setUpdates((updatesResult.data ?? []) as TaskUpdate[]);
+    setLoading(false);
   }, [job.id]);
+
+  useEffect(() => {
+    void loadDetails();
+  }, [loadDetails]);
 
   const toggleItem = async (item: ChecklistItem) => {
     const completed = !item.is_completed;
@@ -375,10 +436,51 @@ function JobDetail({
       if (transitionError) setError(friendlyError(transitionError));
       else {
         setStatus(nextStatus);
+        if (nextStatus === "in_progress") setBlockerReason("");
         await onChanged();
       }
     } catch (transitionError) {
       setError(friendlyError(transitionError));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addUpdate = async () => {
+    const hoursValue = hours.trim() ? Number(hours) : 0;
+    const normalizedGithubUrl = normalizeExternalUrl(githubUrl);
+    if (!updateBody.trim()) return setError("Write an update before saving.");
+    if (!Number.isFinite(hoursValue) || hoursValue < 0)
+      return setError("Logged hours must be zero or greater.");
+    if (githubUrl.trim() && !normalizedGithubUrl)
+      return setError("Enter a valid GitHub issue or PR URL.");
+    setSaving(true);
+    setError(null);
+    try {
+      const { error: updateError } = await supabase.rpc(
+        "add_assigned_task_update",
+        {
+          target_job_id: job.id,
+          update_kind: updateKind,
+          update_body: updateBody.trim(),
+          hours_value: hoursValue,
+          github_url_value: normalizedGithubUrl,
+        },
+      );
+      if (updateError) throw updateError;
+      if (hoursValue > 0) setLoggedHours((current) => current + hoursValue);
+      if (normalizedGithubUrl) setGithubUrl(normalizedGithubUrl);
+      if (updateKind === "blocker") {
+        setStatus("blocked");
+        setBlockerReason(updateBody.trim());
+      }
+      setUpdateBody("");
+      setHours("");
+      setUpdateKind("progress");
+      await loadDetails();
+      await onChanged();
+    } catch (updateError) {
+      setError(friendlyError(updateError));
     } finally {
       setSaving(false);
     }
@@ -391,17 +493,21 @@ function JobDetail({
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Pressable onPress={onBack}>
-        <Text style={styles.backText}>← Assigned jobs</Text>
+        <Text style={styles.backText}>← Assigned tasks</Text>
       </Pressable>
       <View>
-        <Text style={styles.kicker}>{job.priority.toUpperCase()} PRIORITY</Text>
+        <Text style={styles.kicker}>
+          {job.project?.code ?? "PROJECT"} · {job.task_type.toUpperCase()}
+        </Text>
         <Text style={styles.title}>{job.title}</Text>
         <Text style={styles.subtitle}>
           {job.description || "No additional instructions."}
         </Text>
       </View>
       <View style={styles.detailMeta}>
-        <Text style={styles.time}>{job.scheduled_date}</Text>
+        <Text style={styles.time}>
+          Due {job.scheduled_date} · {loggedHours}h logged
+        </Text>
         <Text style={styles.badge}>{formatJobStatus(status)}</Text>
       </View>
       {error && (
@@ -411,7 +517,7 @@ function JobDetail({
       )}
 
       <View style={styles.detailCard}>
-        <Text style={styles.sectionTitle}>Checklist</Text>
+        <Text style={styles.sectionTitle}>Subtasks</Text>
         {loading ? (
           <ActivityIndicator color="#1F7A5A" />
         ) : checklist.length ? (
@@ -443,15 +549,146 @@ function JobDetail({
             </Pressable>
           ))
         ) : (
-          <Text style={styles.meta}>No checklist items for this job.</Text>
+          <Text style={styles.meta}>No subtasks for this task.</Text>
+        )}
+      </View>
+
+      <View style={styles.detailCard}>
+        <Text style={styles.sectionTitle}>Development details</Text>
+        <Text style={styles.meta}>
+          Estimate:{" "}
+          {job.estimated_hours == null
+            ? "Not estimated"
+            : `${Number(job.estimated_hours)} hours`}
+        </Text>
+        {blockerReason && (
+          <View style={styles.blockerCard}>
+            <Text style={styles.blockerLabel}>CURRENT BLOCKER</Text>
+            <Text style={styles.blockerText}>{blockerReason}</Text>
+          </View>
+        )}
+        {normalizeExternalUrl(githubUrl || job.github_url) ? (
+          <Pressable
+            onPress={() =>
+              Linking.openURL(
+                normalizeExternalUrl(githubUrl || job.github_url)!,
+              ).catch((openError) => setError(friendlyError(openError)))
+            }
+          >
+            <Text style={styles.linkText}>Open GitHub issue or PR ↗</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.meta}>No GitHub issue or PR linked.</Text>
+        )}
+      </View>
+
+      {status !== "completed" && (
+        <View style={styles.detailCard}>
+          <Text style={styles.sectionTitle}>Add update</Text>
+          <View style={styles.kindRow}>
+            {(["progress", "blocker", "time", "link"] as const).map((kind) => (
+              <Pressable
+                key={kind}
+                onPress={() => setUpdateKind(kind)}
+                style={[
+                  styles.kindButton,
+                  updateKind === kind && styles.kindButtonActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.kindText,
+                    updateKind === kind && styles.kindTextActive,
+                  ]}
+                >
+                  {kind}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <TextInput
+            multiline
+            onChangeText={setUpdateBody}
+            placeholder={
+              updateKind === "blocker"
+                ? "What is blocked and what help is needed?"
+                : "What changed, what is next, or what was completed?"
+            }
+            style={styles.updateInput}
+            textAlignVertical="top"
+            value={updateBody}
+          />
+          <View style={styles.updateFields}>
+            <TextInput
+              keyboardType="decimal-pad"
+              onChangeText={setHours}
+              placeholder="Hours"
+              style={[styles.input, styles.flexInput]}
+              value={hours}
+            />
+            <TextInput
+              autoCapitalize="none"
+              keyboardType="url"
+              onChangeText={setGithubUrl}
+              placeholder="GitHub issue or PR URL"
+              style={[styles.input, styles.flexWideInput]}
+              value={githubUrl}
+            />
+          </View>
+          <ActionButton
+            disabled={saving}
+            label="Save update"
+            onPress={addUpdate}
+          />
+        </View>
+      )}
+
+      <View style={styles.detailCard}>
+        <Text style={styles.sectionTitle}>Update history</Text>
+        {loading ? (
+          <ActivityIndicator color="#1F7A5A" />
+        ) : updates.length ? (
+          updates.map((update) => (
+            <View style={styles.updateCard} key={update.id}>
+              <View style={styles.row}>
+                <Text
+                  style={[
+                    styles.updateBadge,
+                    update.update_type === "blocker" &&
+                      styles.updateBadgeBlocker,
+                  ]}
+                >
+                  {update.update_type}
+                </Text>
+                {Number(update.hours_logged) > 0 && (
+                  <Text style={styles.meta}>
+                    +{Number(update.hours_logged)}h
+                  </Text>
+                )}
+              </View>
+              <Text style={styles.updateText}>{update.body}</Text>
+              <Text style={styles.updateDate}>
+                {new Date(update.created_at).toLocaleString()}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.meta}>No updates yet.</Text>
         )}
       </View>
 
       <View style={styles.actionStack}>
-        {["assigned", "scheduled", "blocked"].includes(status) && (
+        {["assigned", "scheduled"].includes(status) && (
           <ActionButton
             disabled={saving}
-            label="Start job"
+            label="Start task"
+            onPress={() => transition("in_progress")}
+          />
+        )}
+        {status === "blocked" && (
+          <ActionButton
+            disabled={saving}
+            label="Resume task"
             onPress={() => transition("in_progress")}
           />
         )}
@@ -460,21 +697,47 @@ function JobDetail({
             <ActionButton
               disabled={saving || requiredIncomplete}
               label={
-                requiredIncomplete ? "Complete checklist first" : "Complete job"
+                requiredIncomplete
+                  ? "Complete subtasks first"
+                  : "Send to code review"
               }
+              onPress={() => transition("code_review")}
+            />
+          </>
+        )}
+        {status === "code_review" && (
+          <>
+            <ActionButton
+              disabled={saving}
+              label="Move to testing"
+              onPress={() => transition("testing")}
+            />
+            <ActionButton
+              secondary
+              disabled={saving}
+              label="Return to development"
+              onPress={() => transition("in_progress")}
+            />
+          </>
+        )}
+        {status === "testing" && (
+          <>
+            <ActionButton
+              disabled={saving}
+              label="Mark task complete"
               onPress={() => transition("completed")}
             />
             <ActionButton
               secondary
               disabled={saving}
-              label="Mark blocked"
-              onPress={() => transition("blocked")}
+              label="Return to development"
+              onPress={() => transition("in_progress")}
             />
           </>
         )}
         {status === "completed" && (
           <View style={styles.successCard}>
-            <Text style={styles.successText}>Job completed successfully.</Text>
+            <Text style={styles.successText}>Task completed successfully.</Text>
           </View>
         )}
       </View>
@@ -718,6 +981,65 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sectionTitle: { color: "#172026", fontSize: 17, fontWeight: "800" },
+  blockerCard: {
+    borderColor: "#F0C5C1",
+    borderWidth: 1,
+    backgroundColor: "#FFF2F1",
+    borderRadius: 8,
+    padding: 12,
+    gap: 4,
+  },
+  blockerLabel: {
+    color: "#A33A32",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+  blockerText: { color: "#7B2E28", fontSize: 13, lineHeight: 19 },
+  linkText: { color: "#1F7A5A", fontSize: 13, fontWeight: "800" },
+  kindRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  kindButton: {
+    borderColor: "#D7DCD9",
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  kindButtonActive: { backgroundColor: "#1F7A5A", borderColor: "#1F7A5A" },
+  kindText: {
+    color: "#59636A",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  kindTextActive: { color: "#FFFFFF" },
+  updateInput: {
+    minHeight: 100,
+    borderColor: "#CED4D0",
+    borderWidth: 1,
+    borderRadius: 9,
+    padding: 12,
+    color: "#172026",
+    backgroundColor: "#FFFFFF",
+  },
+  updateFields: { flexDirection: "row", gap: 8 },
+  flexInput: { flex: 0.35, marginBottom: 0 },
+  flexWideInput: { flex: 1, marginBottom: 0 },
+  updateCard: {
+    borderTopColor: "#EEF0EE",
+    borderTopWidth: 1,
+    paddingTop: 11,
+    gap: 7,
+  },
+  updateBadge: {
+    color: "#1F7A5A",
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  updateBadgeBlocker: { color: "#A33A32" },
+  updateText: { color: "#374047", fontSize: 14, lineHeight: 20 },
+  updateDate: { color: "#8A938E", fontSize: 11 },
   checklistRow: {
     flexDirection: "row",
     alignItems: "center",

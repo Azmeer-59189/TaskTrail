@@ -29,10 +29,10 @@ export default async function LoginPage({
             TaskTrail
           </p>
           <h1 className="mt-3 max-w-2xl text-4xl font-semibold text-ink">
-            Run field work from assignment to completion.
+            Run software delivery from assignment to completion.
           </h1>
           <p className="mt-3 max-w-xl text-zinc-600">
-            Managers use this dashboard. Workers sign in through the mobile app.
+            Managers use this dashboard. Developers sign in through the mobile app.
           </p>
         </div>
 

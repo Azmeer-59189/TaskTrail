@@ -2,7 +2,7 @@
   "name": "tasktrail",
   "version": "0.1.0",
   "private": true,
-  "description": "Mobile and web based field operations app for service teams.",
+  "description": "Web and mobile task management for software teams.",
   "workspaces": [
     "apps/*",
     "packages/*"

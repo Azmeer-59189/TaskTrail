@@ -5,6 +5,8 @@ export const JOB_STATUSES = [
   "assigned",
   "in_progress",
   "blocked",
+  "code_review",
+  "testing",
   "completed",
   "reviewed",
   "cancelled",
@@ -14,6 +16,14 @@ export const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 export type Role = (typeof ROLES)[number];
 export type JobStatus = (typeof JOB_STATUSES)[number];
 export type Priority = (typeof PRIORITIES)[number];
+export const TASK_TYPES = [
+  "feature",
+  "bug",
+  "improvement",
+  "research",
+  "maintenance",
+] as const;
+export type TaskType = (typeof TASK_TYPES)[number];
 
 export type Workspace = {
   id: string;

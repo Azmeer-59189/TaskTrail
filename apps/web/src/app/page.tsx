@@ -1,4 +1,4 @@
-import { ClipboardCheck, MapPin, UsersRound } from "lucide-react";
+import { ClipboardCheck, Code2, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../components/app-shell";
 import { requireWorkspaceContext } from "../lib/current-context";
@@ -31,7 +31,9 @@ export default async function HomePage() {
       .eq("status", "active"),
     supabase
       .from("jobs")
-      .select("id, title, status, scheduled_date, priority")
+      .select(
+        "id, title, status, scheduled_date, priority, project:projects(code)",
+      )
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false })
       .limit(5),
@@ -53,17 +55,17 @@ export default async function HomePage() {
           className="w-fit rounded bg-ink px-4 py-2.5 text-sm font-semibold text-white"
           href="/jobs/new"
         >
-          Create job
+          Create task
         </Link>
       </header>
       <div className="grid gap-4 md:grid-cols-3">
         <Metric
           icon={<ClipboardCheck size={20} />}
-          label="Open jobs"
+          label="Open tasks"
           value={String(openJobs ?? 0)}
         />
         <Metric
-          icon={<MapPin size={20} />}
+          icon={<Code2 size={20} />}
           label="In progress"
           value={String(activeJobs ?? 0)}
         />
@@ -76,51 +78,63 @@ export default async function HomePage() {
       <div className="mt-6 overflow-hidden rounded border border-zinc-200 bg-white">
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
           <div>
-            <h2 className="font-semibold text-ink">Recent jobs</h2>
-            <p className="text-sm text-zinc-500">Latest scheduled field work</p>
+            <h2 className="font-semibold text-ink">Recent tasks</h2>
+            <p className="text-sm text-zinc-500">
+              Latest software delivery work
+            </p>
           </div>
           <Link className="text-sm font-semibold text-field" href="/jobs">
             View all
           </Link>
         </div>
         <div className="divide-y divide-zinc-100">
-          {(recentJobs ?? []).map((job) => (
-            <div
-              className="flex items-center justify-between gap-4 px-5 py-4"
-              key={job.id}
-            >
-              <div>
-                <p className="font-medium text-ink">{job.title}</p>
-                <p className="text-xs text-zinc-500">{job.scheduled_date}</p>
+          {(recentJobs ?? []).map((job) => {
+            const project = Array.isArray(job.project)
+              ? job.project[0]
+              : job.project;
+            return (
+              <div
+                className="flex items-center justify-between gap-4 px-5 py-4"
+                key={job.id}
+              >
+                <div>
+                  <p className="font-medium text-ink">{job.title}</p>
+                  <p className="text-xs text-zinc-500">
+                    {project?.code ?? "PROJECT"} · Due {job.scheduled_date}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold uppercase text-field">
+                    {job.status.replace("_", " ")}
+                  </p>
+                  <p className="text-xs uppercase text-zinc-400">
+                    {job.priority}
+                  </p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-bold uppercase text-field">
-                  {job.status.replace("_", " ")}
-                </p>
-                <p className="text-xs uppercase text-zinc-400">
-                  {job.priority}
-                </p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {!recentJobs?.length && (
             <div className="px-5 py-12 text-center">
-              <p className="font-semibold text-ink">Ready for your first job</p>
+              <p className="font-semibold text-ink">
+                Ready for your first task
+              </p>
               <p className="mt-1 text-sm text-zinc-500">
-                Add a customer, site, and worker, then create an assignment.
+                Create a project, add a team member, then assign development
+                work.
               </p>
               <div className="mt-4 flex justify-center gap-3">
                 <Link
                   className="rounded border border-zinc-300 px-3 py-2 text-sm font-medium"
-                  href="/customers"
+                  href="/projects"
                 >
-                  Add customer
+                  Add project
                 </Link>
                 <Link
                   className="rounded border border-zinc-300 px-3 py-2 text-sm font-medium"
                   href="/team"
                 >
-                  Add worker
+                  Add developer
                 </Link>
               </div>
             </div>

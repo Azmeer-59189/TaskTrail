@@ -3,8 +3,8 @@ import { signOut } from "../app/auth/actions";
 
 const links = [
   { href: "/", label: "Dashboard" },
-  { href: "/jobs", label: "Jobs" },
-  { href: "/customers", label: "Customers" },
+  { href: "/projects", label: "Projects" },
+  { href: "/jobs", label: "Tasks" },
   { href: "/team", label: "Team" },
 ];
 

@@ -1,36 +1,35 @@
 # Supabase Setup
 
-This folder contains TaskTrail database migrations, policies, storage setup notes, and seed data.
+This folder contains TaskTrail database migrations, Row Level Security policies, and seed-data notes.
 
-## Phase 3 Setup
+## Migration Order
 
-Authentication, workspace onboarding, team management, customers, sites, job assignment, and mobile job actions are implemented. To activate them in your Supabase project:
+Run migrations through the Supabase SQL Editor in filename order:
 
-1. Open the Supabase dashboard for the project configured in the root `.env` file.
-2. Open **SQL Editor** and create a new query.
-3. Run `migrations/0001_initial_schema.sql` if the initial tables have not been created yet.
-4. Run `migrations/0002_auth_and_rls.sql` to add the Auth profile trigger, workspace bootstrap function, and row-level security policies.
-5. Run `migrations/0003_jobs_mvp.sql` to add the secure mobile job-status transition function.
-6. In **Authentication -> URL Configuration**, set the local site URL to `http://localhost:3000`.
-7. Restart the web and mobile development servers after applying migrations or changing environment variables.
+1. `0001_initial_schema.sql` creates the original workspace, membership, and task records.
+2. `0002_auth_and_rls.sql` adds Auth integration, workspace bootstrap, and access policies.
+3. `0003_jobs_mvp.sql` adds secure assigned-task transitions.
+4. `0004_proof_of_work.sql` is retained as migration history from the field-service prototype.
+5. `0005_software_workflow.sql` adds projects and software-delivery fields, developer updates, code-review/testing states, and replaces the old worker workflow.
 
-If migrations `0001` and `0002` were already applied, run only `0003`.
+If `0001` through `0004` are already applied, run only `0005` now. Do not rerun or delete `0004` from an existing database.
+
+Migration `0005` removes the old field-proof policies and function, but intentionally leaves the private `job-proof` bucket and any existing objects intact. This avoids destructive data loss during the product pivot.
+
+After applying migrations or changing environment variables, restart the web and mobile development servers.
+
+## Authentication Configuration
+
+In **Authentication -> URL Configuration**, set the local site URL to `http://localhost:3000`.
+
+The root `.env` file must contain the Supabase URL and public anonymous key for both clients. The service-role key is used only by trusted web server actions. Never expose `SUPABASE_SERVICE_ROLE_KEY` through a browser-prefixed or mobile environment variable.
 
 ## First End-to-End Test
 
 1. Sign in to the web portal as the workspace admin.
-2. Open **Customers**, create a customer, then add a site for that customer.
-3. Open **Team** and create a worker. Keep the temporary password shown there.
-4. Open **Jobs**, create a job, and assign it to the worker.
-5. Sign in to the mobile app with the worker email and temporary password.
-6. Open the assigned job, complete its required checklist items, and use the status buttons to start and complete it.
-
-Never place `SUPABASE_SERVICE_ROLE_KEY` in a mobile or browser-prefixed environment variable.
-
-## Planned Setup Order
-
-1. Create Supabase project.
-2. Add environment variables to the repository root `.env` file.
-3. Run the database migrations in filename order.
-4. Create storage buckets for job photos and signatures during Phase 4.
-5. Add seed data for local/demo use.
+2. Open **Projects** and create a software project.
+3. Open **Team** and create a developer account. Keep the temporary password shown there.
+4. Open **Tasks**, create a task with subtasks, and assign it to the developer.
+5. Sign in to the mobile app with the developer email and temporary password.
+6. Start the task, complete subtasks, add progress or time updates, and send it to code review.
+7. Confirm that status, progress, logged time, blockers, and updates appear on the web task detail page.

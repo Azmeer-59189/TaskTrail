@@ -1,8 +1,8 @@
 # TaskTrail
 
-TaskTrail is a field-operations platform for service teams. Admins and managers use the web dashboard to organize customers, sites, workers, and jobs. Field workers use the Expo mobile app to receive assignments, update job status, and complete required checklists.
+TaskTrail is a lightweight project and task-tracking platform for software teams. Admins and managers use the web dashboard to create projects, organize tasks, assign developers, and monitor delivery. Developers use the Expo mobile app to work through subtasks, post progress updates, log time, report blockers, and move work through code review and testing.
 
-The repository is an npm-workspaces monorepo containing a Next.js dashboard, an Expo React Native application, shared TypeScript domain code, and Supabase database migrations.
+The repository is an npm-workspaces monorepo containing a Next.js dashboard, an Expo React Native application, shared TypeScript domain code, and Supabase migrations.
 
 ## Current Features
 
@@ -10,42 +10,43 @@ The repository is an npm-workspaces monorepo containing a Next.js dashboard, an 
 
 - Admin registration, login, logout, and workspace onboarding
 - Role-aware access for admins and managers
-- Worker and manager account creation
-- Customer and service-site management
-- Job scheduling, prioritization, and assignment
-- Dashboard status metrics and recent jobs
-- Checklist progress on the job list
-- Job details with checklist completion timestamps and activity history
+- Developer and manager account creation
+- Project creation with repository links
+- Task creation, prioritization, estimates, due dates, subtasks, and assignment
+- Dashboard status metrics and recent tasks
+- Task details with subtask progress, time logged, developer updates, and activity
 
 ### Mobile application
 
-- Persistent worker authentication
-- Assigned-job list and job details
-- Required checklist completion
-- Controlled job transitions: start, block, resume, and complete
+- Persistent developer authentication
+- Assigned-task list and task details
+- Required subtask completion
+- Progress, blocker, time, and link updates
+- GitHub issue or pull-request links
+- Controlled workflow: start, block, resume, code review, testing, and complete
 - Changes reflected in the manager dashboard
 
 ### Backend and security
 
 - Supabase Auth and PostgreSQL
 - Row Level Security scoped by workspace and role
-- Secure database function for worker job transitions
+- Secure database functions for developer task updates and status transitions
 - Automatic profile creation for new Auth users
 
 ## Technology
 
-- Next.js 14, React 18, Tailwind CSS
-- Expo SDK 54, React Native 0.81, React 19
+- Next.js 14, React 18, and Tailwind CSS
+- Expo SDK 54, React Native 0.81, and React 19
 - TypeScript and npm workspaces
 - Supabase Auth, PostgreSQL, and Row Level Security
-- Shared types and formatting utilities in `packages/shared`
+- Shared domain types and formatting utilities in `packages/shared`
 
 ## Repository Structure
 
 ```text
 apps/
   web/                 Next.js admin and manager dashboard
-  mobile/              Expo worker application
+  mobile/              Expo developer application
 packages/
   shared/              Shared domain types and utilities
 supabase/
@@ -94,15 +95,13 @@ supabase/
    EXPO_PUBLIC_SUPABASE_ANON_KEY=
    ```
 
-   The web and mobile public values can reference the same Supabase project. Keep `SUPABASE_SERVICE_ROLE_KEY` server-side and never place it in an `EXPO_PUBLIC_*` or `NEXT_PUBLIC_*` variable.
+   The web and mobile public values can reference the same Supabase project. Keep `SUPABASE_SERVICE_ROLE_KEY` server-side and never expose it through an `EXPO_PUBLIC_*` or `NEXT_PUBLIC_*` variable.
 
-4. In the Supabase SQL Editor, run these migrations in order:
+4. In the Supabase SQL Editor, run the files in `supabase/migrations` in filename order.
 
-   1. `supabase/migrations/0001_initial_schema.sql`
-   2. `supabase/migrations/0002_auth_and_rls.sql`
-   3. `supabase/migrations/0003_jobs_mvp.sql`
+   Migration `0004` is retained as historical migration history from the original field-service prototype. Migration `0005` safely supersedes it with the software-team workflow. Existing installations that already ran `0004` should run only `0005` next.
 
-   See [Supabase setup](supabase/README.md) for additional details.
+   See [Supabase setup](supabase/README.md) for details.
 
 5. In Supabase Authentication URL Configuration, set the local site URL to `http://localhost:3000`.
 
@@ -131,12 +130,12 @@ npm run start:clean -w @tasktrail/mobile
 ## First End-to-End Workflow
 
 1. Register an admin account on the web and create a workspace.
-2. Create a customer and at least one service site.
-3. Create a worker from the Team page and retain the temporary password.
-4. Create a job with checklist items and assign it to that worker.
-5. Sign into the mobile app with the worker credentials.
-6. Start the job, complete its checklist, and mark it complete.
-7. Refresh the web Jobs page to review status, progress, timestamps, and activity.
+2. Create a project and optionally add its repository URL.
+3. Create a developer from the Team page and retain the temporary password.
+4. Create a task with subtasks and assign it to the developer.
+5. Sign into the mobile app with the developer credentials.
+6. Start the task, complete subtasks, log progress or time, and send it to code review.
+7. Move the task through testing and completion while monitoring it from the web portal.
 
 ## Useful Commands
 
@@ -150,19 +149,11 @@ npm run start:clean -w @tasktrail/mobile
 
 ## Documentation
 
-- [Project overview](PROJECT_OVERVIEW.md)
-- [Architecture](ARCHITECTURE.md)
-- [Complete product flow](PROJECT_FLOW.md)
-- [Data model](DATA_MODEL.md)
-- [Technology choices](TECH_STACK.md)
-- [Build phases and roadmap](BUILD_PHASES.md)
-- [Decision log](DECISIONS.md)
-
-These files are intentionally versioned because they document product scope, architecture decisions, and planned implementation phases.
+- [Supabase setup and migration order](supabase/README.md)
 
 ## Current Scope
 
-TaskTrail currently covers the Phase 3 jobs MVP and checklist tracking. Photo proof, notes, signatures, GPS check-in, manager review, reports, realtime subscriptions, and production deployment are planned follow-up phases.
+TaskTrail currently covers the core software-delivery workflow: projects, team accounts, task assignment, subtasks, estimates, time logging, developer updates, blockers, GitHub links, code review, testing, and completion. Realtime subscriptions, notifications, sprint planning, reporting, and production deployment remain future phases.
 
 ## Security
 

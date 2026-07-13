@@ -1,10 +1,11 @@
 "use server";
 
-import type { Priority, Role } from "@tasktrail/shared";
+import type { Priority, Role, TaskType } from "@tasktrail/shared";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireWorkspaceContext } from "../../lib/current-context";
 import { createSupabaseAdminClient } from "../../lib/supabase/admin";
+import { normalizeExternalUrl } from "../../lib/urls";
 
 const value = (formData: FormData, name: string) =>
   String(formData.get(name) ?? "").trim();
@@ -105,17 +106,43 @@ export async function createSite(formData: FormData) {
   if (!customerId || !name || !address)
     go("/customers", "error", "Customer, site name, and address are required.");
 
-  const { error } = await supabase
-    .from("sites")
-    .insert({
-      workspace_id: workspace.id,
-      customer_id: customerId,
-      name,
-      address,
-    });
+  const { error } = await supabase.from("sites").insert({
+    workspace_id: workspace.id,
+    customer_id: customerId,
+    name,
+    address,
+  });
   if (error) go("/customers", "error", error.message);
   revalidatePath("/customers");
   go("/customers", "success", `${name} site was added.`);
+}
+
+export async function createProject(formData: FormData) {
+  const { supabase, workspace } = await requireWorkspaceContext([
+    "admin",
+    "manager",
+  ]);
+  const name = value(formData, "name");
+  const code = value(formData, "code")
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, "");
+  const repositoryInput = value(formData, "repositoryUrl");
+  const repositoryUrl = normalizeExternalUrl(repositoryInput);
+  if (!name || !code)
+    go("/projects", "error", "Project name and code are required.");
+  if (repositoryInput && !repositoryUrl)
+    go("/projects", "error", "Enter a valid repository URL.");
+
+  const { error } = await supabase.from("projects").insert({
+    workspace_id: workspace.id,
+    name,
+    code,
+    description: value(formData, "description") || null,
+    repository_url: repositoryUrl,
+  });
+  if (error) go("/projects", "error", error.message);
+  revalidatePath("/projects");
+  go("/projects", "success", `${name} project was created.`);
 }
 
 export async function createJob(formData: FormData) {
@@ -124,34 +151,47 @@ export async function createJob(formData: FormData) {
     "manager",
   ]);
   const title = value(formData, "title");
-  const customerId = value(formData, "customerId");
-  const siteId = value(formData, "siteId");
+  const projectId = value(formData, "projectId");
   const assignedTo = value(formData, "assignedTo");
   const scheduledDate = value(formData, "scheduledDate");
   const priority = value(formData, "priority") as Priority;
+  const taskType = value(formData, "taskType") as TaskType;
+  const estimatedHours = Number(value(formData, "estimatedHours"));
+  const githubInput = value(formData, "githubUrl");
+  const githubUrl = normalizeExternalUrl(githubInput);
   if (
     !title ||
-    !customerId ||
-    !siteId ||
+    !projectId ||
     !scheduledDate ||
-    !["low", "normal", "high", "urgent"].includes(priority)
+    !["low", "normal", "high", "urgent"].includes(priority) ||
+    !["feature", "bug", "improvement", "research", "maintenance"].includes(
+      taskType,
+    ) ||
+    !Number.isFinite(estimatedHours) ||
+    estimatedHours < 0
   ) {
-    go("/jobs/new", "error", "Complete all required job fields.");
+    go("/jobs/new", "error", "Complete all required task fields.");
   }
+  if (githubInput && !githubUrl)
+    go("/jobs/new", "error", "Enter a valid GitHub issue or PR URL.");
 
   const { data: job, error } = await supabase
     .from("jobs")
     .insert({
       workspace_id: workspace.id,
-      customer_id: customerId,
-      site_id: siteId,
+      project_id: projectId,
+      customer_id: null,
+      site_id: null,
       title,
       description: value(formData, "description") || null,
       priority,
+      task_type: taskType,
+      estimated_hours: estimatedHours || null,
+      github_url: githubUrl,
       status: assignedTo ? "assigned" : "scheduled",
       scheduled_date: scheduledDate,
-      time_window_start: value(formData, "timeStart") || null,
-      time_window_end: value(formData, "timeEnd") || null,
+      time_window_start: null,
+      time_window_end: null,
       assigned_to: assignedTo || null,
       created_by: profile.id,
     })
@@ -179,19 +219,17 @@ export async function createJob(formData: FormData) {
       go(
         "/jobs",
         "error",
-        `Job created, but checklist failed: ${checklistError.message}`,
+        `Task created, but subtasks failed: ${checklistError.message}`,
       );
   }
 
-  await supabase
-    .from("job_events")
-    .insert({
-      job_id: jobId,
-      profile_id: profile.id,
-      event_type: "created",
-      message: assignedTo ? "Job created and assigned" : "Job scheduled",
-    });
+  await supabase.from("job_events").insert({
+    job_id: jobId,
+    profile_id: profile.id,
+    event_type: "created",
+    message: assignedTo ? "Task created and assigned" : "Task scheduled",
+  });
   revalidatePath("/");
   revalidatePath("/jobs");
-  go("/jobs", "success", `${title} was created.`);
+  go("/jobs", "success", `${title} task was created.`);
 }
