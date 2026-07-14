@@ -11,8 +11,10 @@ Run migrations through the Supabase SQL Editor in filename order:
 3. `0003_jobs_mvp.sql` adds secure assigned-task transitions.
 4. `0004_proof_of_work.sql` is retained as migration history from the field-service prototype.
 5. `0005_software_workflow.sql` adds projects and software-delivery fields, developer updates, code-review/testing states, and replaces the old worker workflow.
+6. `0006_realtime.sql` publishes task, update, checklist, event, and project changes for live dashboard and mobile refreshes.
+7. `0007_notifications.sql` adds private in-app notifications for assignments, status changes, and developer updates.
 
-If `0001` through `0004` are already applied, run only `0005` now. Do not rerun or delete `0004` from an existing database.
+If `0001` through `0006` are already applied, run only `0007` now. Do not rerun or delete `0004` from an existing database.
 
 Migration `0005` removes the old field-proof policies and function, but intentionally leaves the private `job-proof` bucket and any existing objects intact. This avoids destructive data loss during the product pivot.
 

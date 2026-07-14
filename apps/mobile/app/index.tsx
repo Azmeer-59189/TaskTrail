@@ -14,7 +14,18 @@ import {
 } from "react-native";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 
-type WorkerContext = { fullName: string; role: string; workspaceName: string };
+type WorkerContext = {
+  profileId: string;
+  fullName: string;
+  role: string;
+  workspaceName: string;
+};
+type Notification = {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+};
 type AssignedJob = {
   id: string;
   title: string;
@@ -174,6 +185,7 @@ function SignInScreen() {
 function WorkerScreen({ session }: { session: Session }) {
   const [context, setContext] = useState<WorkerContext | null>(null);
   const [jobs, setJobs] = useState<AssignedJob[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -212,7 +224,11 @@ function WorkerScreen({ session }: { session: Session }) {
         return;
       }
 
-      const [{ data: workspace }, { data: assignedJobs, error: jobsError }] =
+      const [
+        { data: workspace },
+        { data: assignedJobs, error: jobsError },
+        { data: unreadNotifications, error: notificationsError },
+      ] =
         await Promise.all([
           supabase
             .from("workspaces")
@@ -226,9 +242,18 @@ function WorkerScreen({ session }: { session: Session }) {
             )
             .eq("assigned_to", profile.id)
             .order("scheduled_date", { ascending: true }),
+          supabase
+            .from("notifications")
+            .select("id, title, body, created_at")
+            .eq("profile_id", profile.id)
+            .is("read_at", null)
+            .order("created_at", { ascending: false })
+            .limit(3),
         ]);
       if (jobsError) setError(friendlyError(jobsError));
+      if (notificationsError) setError(friendlyError(notificationsError));
       setContext({
+        profileId: profile.id,
         fullName: profile.full_name,
         role: membership.role,
         workspaceName: workspace?.name ?? "Workspace",
@@ -239,6 +264,7 @@ function WorkerScreen({ session }: { session: Session }) {
           project: Array.isArray(task.project) ? task.project[0] : task.project,
         })) as AssignedJob[],
       );
+      setNotifications((unreadNotifications ?? []) as Notification[]);
     } catch (loadError) {
       setError(friendlyError(loadError));
     } finally {
@@ -249,6 +275,36 @@ function WorkerScreen({ session }: { session: Session }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!context?.profileId) return;
+    const channel = supabase
+      .channel("tasktrail:notifications")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `profile_id=eq.${context.profileId}` },
+        () => void load(),
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [context?.profileId, load]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("tasktrail:assigned-jobs")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "jobs" },
+        () => void load(),
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [load]);
+
   const refresh = async () => {
     setRefreshing(true);
     await load();
@@ -294,6 +350,17 @@ function WorkerScreen({ session }: { session: Session }) {
       {error && (
         <View style={styles.errorCard}>
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+      {notifications.length > 0 && (
+        <View style={styles.notificationCard}>
+          <Text style={styles.sectionTitle}>New updates</Text>
+          {notifications.map((notification) => (
+            <View style={styles.notificationItem} key={notification.id}>
+              <Text style={styles.notificationTitle}>{notification.title}</Text>
+              <Text style={styles.meta}>{notification.body}</Text>
+            </View>
+          ))}
         </View>
       )}
       <View style={styles.list}>
@@ -400,6 +467,31 @@ function JobDetail({
   useEffect(() => {
     void loadDetails();
   }, [loadDetails]);
+
+  useEffect(() => {
+    const refresh = () => void loadDetails();
+    const channel = supabase
+      .channel(`tasktrail:job:${job.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "jobs", filter: `id=eq.${job.id}` },
+        refresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "job_checklist_items", filter: `job_id=eq.${job.id}` },
+        refresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "task_updates", filter: `job_id=eq.${job.id}` },
+        refresh,
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [job.id, loadDetails]);
 
   const toggleItem = async (item: ChecklistItem) => {
     const completed = !item.is_completed;
@@ -945,6 +1037,16 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     padding: 13,
   },
+  notificationCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#B8DACB",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 16,
+    gap: 10,
+  },
+  notificationItem: { borderTopColor: "#EEF0EE", borderTopWidth: 1, paddingTop: 10, gap: 3 },
+  notificationTitle: { color: "#172026", fontSize: 14, fontWeight: "800" },
   centered: {
     flex: 1,
     alignItems: "center",

@@ -1,6 +1,7 @@
 import { formatJobStatus, type JobStatus } from "@tasktrail/shared";
 import Link from "next/link";
 import { AppShell, Notice } from "../../components/app-shell";
+import { RealtimeRefresh } from "../../components/realtime-refresh";
 import { requireWorkspaceContext } from "../../lib/current-context";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export default async function TasksPage({
 
   return (
     <AppShell currentPath="/jobs" workspaceName={workspace.name}>
+      <RealtimeRefresh workspaceId={workspace.id} />
       <header className="mb-6 flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-field">Development</p>

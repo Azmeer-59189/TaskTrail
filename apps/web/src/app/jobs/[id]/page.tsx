@@ -1,6 +1,7 @@
 import { formatJobStatus, type JobStatus } from "@tasktrail/shared";
 import Link from "next/link";
 import { AppShell, Notice } from "../../../components/app-shell";
+import { RealtimeRefresh } from "../../../components/realtime-refresh";
 import { requireWorkspaceContext } from "../../../lib/current-context";
 import { normalizeExternalUrl } from "../../../lib/urls";
 
@@ -60,6 +61,7 @@ export default async function TaskDetailsPage({
 
   return (
     <AppShell currentPath="/jobs" workspaceName={workspace.name}>
+      <RealtimeRefresh jobId={params.id} workspaceId={workspace.id} />
       <header className="mb-6">
         <Link className="text-sm font-medium text-field" href="/jobs">
           ← Tasks

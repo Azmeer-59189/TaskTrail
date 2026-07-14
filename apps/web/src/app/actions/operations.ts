@@ -233,3 +233,16 @@ export async function createJob(formData: FormData) {
   revalidatePath("/jobs");
   go("/jobs", "success", `${title} task was created.`);
 }
+
+export async function markNotificationRead(formData: FormData) {
+  const { supabase, profile } = await requireWorkspaceContext(["admin", "manager"]);
+  const notificationId = value(formData, "notificationId");
+  if (!notificationId) return;
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", notificationId)
+    .eq("profile_id", profile.id);
+  if (error) go("/notifications", "error", error.message);
+  revalidatePath("/notifications");
+}

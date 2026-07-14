@@ -24,14 +24,14 @@ The repository is an npm-workspaces monorepo containing a Next.js dashboard, an 
 - Progress, blocker, time, and link updates
 - GitHub issue or pull-request links
 - Controlled workflow: start, block, resume, code review, testing, and complete
-- Changes reflected in the manager dashboard
+- Live task refreshes when teammates update work
 
 ### Backend and security
 
 - Supabase Auth and PostgreSQL
 - Row Level Security scoped by workspace and role
 - Secure database functions for developer task updates and status transitions
-- Automatic profile creation for new Auth users
+- Automatic profile creation for new Auth users and realtime task publication
 
 ## Technology
 
@@ -153,7 +153,7 @@ npm run start:clean -w @tasktrail/mobile
 
 ## Current Scope
 
-TaskTrail currently covers the core software-delivery workflow: projects, team accounts, task assignment, subtasks, estimates, time logging, developer updates, blockers, GitHub links, code review, testing, and completion. Realtime subscriptions, notifications, sprint planning, reporting, and production deployment remain future phases.
+TaskTrail currently covers the core software-delivery workflow, live dashboard/mobile refreshes, and in-app notifications: projects, team accounts, task assignment, subtasks, estimates, time logging, developer updates, blockers, GitHub links, code review, testing, and completion. Sprint planning, reporting, and production deployment remain future phases.
 
 ## Security
 

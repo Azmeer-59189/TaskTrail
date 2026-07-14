@@ -1,6 +1,7 @@
 import { ClipboardCheck, Code2, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../components/app-shell";
+import { RealtimeRefresh } from "../components/realtime-refresh";
 import { requireWorkspaceContext } from "../lib/current-context";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,7 @@ export default async function HomePage() {
 
   return (
     <AppShell currentPath="/" workspaceName={workspace.name}>
+      <RealtimeRefresh workspaceId={workspace.id} />
       <header className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <p className="text-sm font-medium text-field">{workspace.name}</p>
