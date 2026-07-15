@@ -4,6 +4,11 @@ TaskTrail is a lightweight project and task-tracking platform for software teams
 
 The repository is an npm-workspaces monorepo containing a Next.js dashboard, an Expo React Native application, shared TypeScript domain code, and Supabase migrations.
 
+## Live Demo
+
+- **Web dashboard:** [Open TaskTrail](https://task-trail-hmo2bh4rr-azmeer.vercel.app/)
+- **Android preview build:** [Download TaskTrail APK](https://expo.dev/accounts/syed_azmeer/projects/tasktrail/builds/90d847fd-b142-4f00-8abf-a74d88d0834f)
+
 ## Current Features
 
 ### Web dashboard
